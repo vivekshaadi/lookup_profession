@@ -1,0 +1,57 @@
+name: Deploy to Self-Hosted Server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install client dependencies
+        run: |
+          cd client
+          npm ci
+
+      - name: Build React app
+        run: |
+          cd client
+          npm run build
+
+      - name: Stop existing application (if running)
+        run: |
+          pkill -f "node server.js" || true
+          sleep 2
+
+      - name: Start application
+        run: |
+          nohup npm start > app.log 2>&1 &
+          sleep 3
+          echo "Application started"
+
+      - name: Verify deployment
+        run: |
+          sleep 5
+          curl -f http://localhost:3001 || (echo "Deployment failed" && exit 1)
+          echo "✅ Application is running successfully!"
+
+      - name: Display application info
+        run: |
+          echo "🚀 Application deployed successfully!"
+          echo "📍 Local URL: http://localhost:3001"
+          echo "📝 Logs: tail -f $(pwd)/app.log"
+          echo "🔄 Process: ps aux | grep 'node server.js'"
